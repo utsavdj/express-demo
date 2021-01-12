@@ -1,10 +1,39 @@
+const startupDebugger = require('debug')('app:startup');
+const dbDebugger = require('debug')('app:db');
+const config = require('config');
+const morgan = require('morgan');
+const helmet = require('helmet');
 const Joi = require('joi');
+const logger = require('./logger');
 const express = require('express');
-const { request } = require('express');
 
 const app = express();
 
+// console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+// console.log(`app get env: ${app.get('env')}`);
+
+// Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
+app.use(helmet());
+
+// Configuration
+startupDebugger('Application Name: ' + config.get('name'));
+startupDebugger('Mail Server: ' + config.get('mail.host'));
+startupDebugger('Mail Password: ' + config.get('mail.password'));
+
+if(app.get('env') === 'development'){
+    app.use(morgan('tiny'));
+    startupDebugger('Morgan enabled...');
+}   
+
+app.use(logger);
+
+app.use(function(req, res, next) {
+    console.log('Authenticating....');
+    next();
+});
 
 const courses = [
     { id: 1, name: 'course1' },
@@ -47,8 +76,8 @@ app.post('/api/courses', (req, res) =>{
 
     const { error } = validateCourse(req.body);
 
-    if(result.error){
-        return res.status(400).send(result.error.details[0].message);
+    if(error){
+        return res.status(400).send(error.details[0].message);
     }
 
     const course = {
@@ -93,6 +122,8 @@ function validateCourse(course){
     return schema.validate(course);
 }
 
+// DB work
+dbDebugger('Connected to the database...');
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Listening on port ${port}....`));
